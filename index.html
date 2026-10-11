@@ -1,0 +1,696 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Linear Algebra Studio - Gaussian Elimination Workbench</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- MathJax CDN & Setup -->
+  <script>
+    window.MathJax = {
+      tex: {
+        inlineMath: [['$', '$'], ['\\(', '\\)']],
+        displayMath: [['$$', '$$'], ['[', ']']]
+      },
+      startup: {
+        pageReady: () => {
+          return MathJax.startup.defaultPageReady();
+        }
+      }
+    };
+  </script>
+  <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+  <style>
+    .matrix-bracket {
+      position: relative;
+    }
+    .matrix-bracket::before, .matrix-bracket::after {
+      content: "";
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 10px;
+      border: 2px solid #3b82f6;
+    }
+    .matrix-bracket::before {
+      left: -6px;
+      border-right: none;
+      border-radius: 6px 0 0 6px;
+    }
+    .matrix-bracket::after {
+      right: -6px;
+      border-left: none;
+      border-radius: 0 6px 6px 0;
+    }
+  </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col font-sans">
+  
+  <!-- Header -->
+  <header class="bg-slate-800 border-b border-slate-700 py-4 px-6">
+    <div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
+      <div>
+        <h1 class="text-2xl font-bold text-blue-400">Linear Algebra Studio</h1>
+        <p class="text-xs text-slate-400">Gaussian Elimination & Row Echelon Form (REF / RREF) Workbench</p>
+      </div>
+      
+      <!-- Controls Bar -->
+      <div class="flex flex-wrap items-center gap-2 bg-slate-900 p-2 rounded-lg border border-slate-700">
+        <label for="target-mode-select" class="text-xs text-slate-300 font-medium">Target:</label>
+        <select id="target-mode-select" class="bg-slate-800 border border-slate-600 text-xs rounded px-2 py-1 text-slate-200 font-semibold">
+          <option value="REF" selected>Row Echelon Form (REF)</option>
+          <option value="RREF">Reduced Row Echelon Form (RREF)</option>
+        </select>
+
+        <span class="text-slate-600">|</span>
+
+        <label for="matrix-size-select" class="text-xs text-slate-300 font-medium">Dimension:</label>
+        <select id="matrix-size-select" onchange="onDimensionChange()" class="bg-slate-800 border border-slate-600 text-xs rounded px-2 py-1 text-slate-200">
+          <option value="2x3">2 &times; 3</option>
+          <option value="3x4" selected>3 &times; 4</option>
+          <option value="4x5">4 &times; 5</option>
+        </select>
+        
+        <button id="btn-generate" type="button" onclick="generateRandomMatrix()" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-xs font-bold rounded text-white shadow transition flex items-center gap-1">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+          Generate New Matrix
+        </button>
+        <button id="btn-custom" type="button" onclick="openCustomModal()" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-xs font-bold rounded text-white shadow transition flex items-center gap-1">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+          Custom Matrix
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Custom Matrix Modal -->
+  <div id="custom-modal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-slate-800 border border-slate-700 rounded-xl shadow-2xl p-6 max-w-2xl w-full flex flex-col gap-4">
+      <div class="flex justify-between items-center border-b border-slate-700 pb-3">
+        <h3 class="text-lg font-bold text-blue-400">Enter Custom Matrix Values</h3>
+        <button onclick="closeCustomModal()" class="text-slate-400 hover:text-slate-100 text-xl font-bold">&times;</button>
+      </div>
+      <p class="text-xs text-slate-400">Enter integers or fractions (e.g., <code class="text-amber-300">3</code>, <code class="text-amber-300">-2</code>, <code class="text-amber-300">1/2</code>, <code class="text-amber-300">-4/5</code>). The rightmost column is the augmented vector $\mathbf{b}$.</p>
+      
+      <div class="overflow-x-auto py-2 flex justify-center">
+        <div id="custom-grid-container" class="matrix-bracket p-3 inline-block"></div>
+      </div>
+
+      <div class="flex justify-end gap-3 pt-3 border-t border-slate-700">
+        <button onclick="closeCustomModal()" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-xs font-semibold rounded text-slate-200">Cancel</button>
+        <button onclick="applyCustomMatrix()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-xs font-bold rounded text-white shadow">Set Custom Matrix</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Body -->
+  <main class="max-w-7xl mx-auto w-full flex-grow p-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
+    
+    <!-- Left Column: Controls & Matrix Display -->
+    <div class="lg:col-span-2 flex flex-col gap-6">
+      
+      <!-- Current Matrix State & Badges -->
+      <div class="bg-slate-800 rounded-xl p-6 border border-slate-700 shadow-xl flex flex-col items-center">
+        <div class="w-full flex justify-between items-center mb-4">
+          <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Current Matrix State</span>
+          <div id="status-badges" class="flex gap-2"></div>
+        </div>
+
+        <!-- Rendered Matrix Visualizer -->
+        <div class="my-6 overflow-x-auto w-full flex justify-center py-4">
+          <div id="matrix-container" class="matrix-bracket p-4 inline-block"></div>
+        </div>
+
+        <div class="flex flex-wrap justify-center gap-3 mt-2">
+          <button onclick="undoStep()" id="btn-undo" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 text-sm font-medium rounded-lg transition">
+            Undo Step
+          </button>
+          <button onclick="getHint()" class="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-sm font-medium rounded-lg text-white shadow transition">
+            Get Hint
+          </button>
+          <button onclick="solveDirectly()" class="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-sm font-medium rounded-lg text-white shadow transition flex items-center gap-1.5">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+            Solve Directly
+          </button>
+          <button onclick="resetMatrix()" class="px-4 py-2 bg-rose-700 hover:bg-rose-600 text-sm font-medium rounded-lg text-white transition">
+            Reset
+          </button>
+        </div>
+      </div>
+
+      <!-- Elementary Row Operation (ERO) Controls -->
+      <div class="bg-slate-800 rounded-xl p-6 border border-slate-700 shadow-xl">
+        <h2 class="text-lg font-semibold text-slate-200 mb-4">Apply Elementary Row Operation (ERO)</h2>
+        
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          
+          <!-- Operation 1: Swap -->
+          <div class="bg-slate-900 p-4 rounded-lg border border-slate-700 flex flex-col justify-between">
+            <div>
+              <h3 class="text-sm font-medium text-blue-400 mb-2">1. Row Swap</h3>
+              <p class="text-xs text-slate-400 mb-3">Swap positions ($R_i \leftrightarrow R_j$)</p>
+              <div class="flex items-center gap-2 mb-3">
+                <span class="text-xs font-mono">R</span>
+                <select id="swap-r1" class="bg-slate-800 border border-slate-600 rounded px-2 py-1 text-sm text-slate-100 w-full"></select>
+                <span class="text-xs font-mono">&harr; R</span>
+                <select id="swap-r2" class="bg-slate-800 border border-slate-600 rounded px-2 py-1 text-sm text-slate-100 w-full"></select>
+              </div>
+            </div>
+            <button onclick="applySwap()" class="w-full bg-blue-600 hover:bg-blue-500 text-xs font-semibold py-2 rounded transition">Apply Swap</button>
+          </div>
+
+          <!-- Operation 2: Scale -->
+          <div class="bg-slate-900 p-4 rounded-lg border border-slate-700 flex flex-col justify-between">
+            <div>
+              <h3 class="text-sm font-medium text-blue-400 mb-2">2. Scale Row</h3>
+              <p class="text-xs text-slate-400 mb-3">Multiply by scalar ($k \cdot R_i \to R_i$)</p>
+              <div class="flex items-center gap-2 mb-3">
+                <input id="scale-k" type="text" placeholder="k (e.g. 1/3)" class="bg-slate-800 border border-slate-600 rounded px-2 py-1 text-sm text-slate-100 w-20 text-center" />
+                <span class="text-xs font-mono">&times; R</span>
+                <select id="scale-r" class="bg-slate-800 border border-slate-600 rounded px-2 py-1 text-sm text-slate-100 w-full"></select>
+              </div>
+            </div>
+            <button onclick="applyScale()" class="w-full bg-blue-600 hover:bg-blue-500 text-xs font-semibold py-2 rounded transition">Apply Scale</button>
+          </div>
+
+          <!-- Operation 3: Add Multiple -->
+          <div class="bg-slate-900 p-4 rounded-lg border border-slate-700 flex flex-col justify-between">
+            <div>
+              <h3 class="text-sm font-medium text-blue-400 mb-2">3. Add Multiple</h3>
+              <p class="text-xs text-slate-400 mb-3">Add multiple ($R_t + k \cdot R_s \to R_t$)</p>
+              <div class="flex flex-col gap-2 mb-3">
+                <div class="flex items-center gap-2">
+                  <span class="text-xs font-mono w-12">Target R:</span>
+                  <select id="add-rt" class="bg-slate-800 border border-slate-600 rounded px-2 py-1 text-sm text-slate-100 w-full"></select>
+                </div>
+                <div class="flex items-center gap-2">
+                  <span class="text-xs font-mono w-12">+ k &times; R:</span>
+                  <input id="add-k" type="text" placeholder="k" class="bg-slate-800 border border-slate-600 rounded px-2 py-1 text-sm text-slate-100 w-16 text-center" />
+                  <select id="add-rs" class="bg-slate-800 border border-slate-600 rounded px-2 py-1 text-sm text-slate-100 w-full"></select>
+                </div>
+              </div>
+            </div>
+            <button onclick="applyAddMultiple()" class="w-full bg-blue-600 hover:bg-blue-500 text-xs font-semibold py-2 rounded transition">Apply Operation</button>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Column: Step History Log & Hint Box -->
+    <div class="flex flex-col gap-6">
+      <div id="hint-card" class="hidden bg-amber-950/40 border border-amber-500/40 rounded-xl p-5 shadow-lg">
+        <div class="flex items-center gap-2 mb-2 text-amber-400 font-semibold text-sm">
+          <span>Instructor Hint</span>
+        </div>
+        <p id="hint-text" class="text-sm text-amber-200/90 leading-relaxed"></p>
+      </div>
+
+      <div class="bg-slate-800 rounded-xl p-6 border border-slate-700 shadow-xl flex-grow flex flex-col">
+        <h2 class="text-lg font-semibold text-slate-200 mb-4">Transformation History</h2>
+        <div id="history-list" class="flex-grow overflow-y-auto max-h-[480px] space-y-3 pr-2"></div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    class Fraction {
+      constructor(num, den = 1) {
+        if (den === 0) throw new Error("Zero denominator");
+        if (typeof num === 'string') {
+          if (num.includes('/')) {
+            const p = num.split('/');
+            num = parseInt(p[0], 10);
+            den = parseInt(p[1], 10);
+          } else {
+            num = parseInt(num, 10);
+            den = 1;
+          }
+        }
+        if (isNaN(num) || isNaN(den)) { num = 0; den = 1; }
+        const g = Fraction.gcd(Math.abs(num), Math.abs(den));
+        this.num = (den < 0 ? -num : num) / g;
+        this.den = Math.abs(den) / g;
+      }
+      static gcd(a, b) { return b === 0 ? a : Fraction.gcd(b, a % b); }
+      add(f) { return new Fraction(this.num * f.den + f.num * this.den, this.den * f.den); }
+      sub(f) { return new Fraction(this.num * f.den - f.num * this.den, this.den * f.den); }
+      mul(f) { return new Fraction(this.num * f.num, this.den * f.den); }
+      div(f) { return new Fraction(this.num * f.den, this.den * f.num); }
+      isZero() { return this.num === 0; }
+      isOne() { return this.num === 1 && this.den === 1; }
+      toTex() {
+        if (this.den === 1) return `${this.num}`;
+        if (this.num < 0) return `-\\frac{${Math.abs(this.num)}}{${this.den}}`;
+        return `\\frac{${this.num}}{${this.den}}`;
+      }
+      toString() {
+        if (this.den === 1) return `${this.num}`;
+        return `${this.num}/${this.den}`;
+      }
+    }
+
+    let matrix = [];
+    let historyStack = [];
+    let mathJaxPromise = Promise.resolve();
+
+    function cloneMatrix(mat) {
+      return mat.map(row => row.map(val => new Fraction(val.num, val.den)));
+    }
+
+    function generateRandomMatrix() {
+      const sizeVal = document.getElementById('matrix-size-select').value;
+      const [rStr, cStr] = sizeVal.split('x');
+      const numRows = parseInt(rStr, 10);
+      const numCols = parseInt(cStr, 10);
+
+      const newMat = [];
+      for (let r = 0; r < numRows; r++) {
+        const row = [];
+        for (let c = 0; c < numCols; c++) {
+          const val = Math.floor(Math.random() * 11) - 5;
+          row.push(new Fraction(val));
+        }
+        newMat.push(row);
+      }
+
+      matrix = newMat;
+      historyStack = [{ matrix: cloneMatrix(matrix), desc: `Generated ${numRows}x${numCols} System` }];
+      hideHint();
+      updateUI();
+    }
+
+    /* Direct Gaussian/Gauss-Jordan Elimination Solver */
+    function solveDirectly() {
+      const targetMode = document.getElementById('target-mode-select').value;
+      const rows = matrix.length;
+      const cols = matrix[0].length;
+      let pivotRow = 0;
+      const pivotPositions = [];
+
+      // Phase 1: Forward Elimination to reach REF
+      for (let c = 0; c < cols - 1 && pivotRow < rows; c++) {
+        let maxRow = pivotRow;
+        while (maxRow < rows && matrix[maxRow][c].isZero()) {
+          maxRow++;
+        }
+
+        if (maxRow === rows) continue;
+
+        if (maxRow !== pivotRow) {
+          const temp = matrix[pivotRow];
+          matrix[pivotRow] = matrix[maxRow];
+          matrix[maxRow] = temp;
+          pushStep(`Swap $R_${pivotRow + 1} \\leftrightarrow R_${maxRow + 1}$`);
+        }
+
+        const pivotVal = matrix[pivotRow][c];
+        if (!pivotVal.isOne()) {
+          const inv = new Fraction(pivotVal.den, pivotVal.num);
+          matrix[pivotRow] = matrix[pivotRow].map(v => v.mul(inv));
+          pushStep(`Scale $${inv.toTex()} \\cdot R_${pivotRow + 1} \\to R_${pivotRow + 1}$`);
+        }
+
+        for (let r = pivotRow + 1; r < rows; r++) {
+          if (!matrix[r][c].isZero()) {
+            const factor = matrix[r][c].mul(new Fraction(-1));
+            matrix[r] = matrix[r].map((v, idx) => v.add(factor.mul(matrix[pivotRow][idx])));
+            pushStep(`Add $R_${r + 1} + (${factor.toTex()}) \\cdot R_${pivotRow + 1} \\to R_${r + 1}$`);
+          }
+        }
+
+        pivotPositions.push({ r: pivotRow, c: c });
+        pivotRow++;
+      }
+
+      // Phase 2: Back Elimination to reach RREF if selected
+      if (targetMode === 'RREF') {
+        for (let i = pivotPositions.length - 1; i >= 0; i--) {
+          const pr = pivotPositions[i].r;
+          const pc = pivotPositions[i].c;
+
+          for (let r = pr - 1; r >= 0; r--) {
+            if (!matrix[r][pc].isZero()) {
+              const factor = matrix[r][pc].mul(new Fraction(-1));
+              matrix[r] = matrix[r].map((v, idx) => v.add(factor.mul(matrix[pr][idx])));
+              pushStep(`Add $R_${r + 1} + (${factor.toTex()}) \\cdot R_${pr + 1} \\to R_${r + 1}$`);
+            }
+          }
+        }
+      }
+
+      hideHint();
+      updateUI();
+    }
+
+    /* Custom Matrix Entry Logic */
+    function openCustomModal() {
+      renderCustomModalGrid();
+      document.getElementById('custom-modal').classList.remove('hidden');
+    }
+
+    function closeCustomModal() {
+      document.getElementById('custom-modal').classList.add('hidden');
+    }
+
+    function onDimensionChange() {
+      if (!document.getElementById('custom-modal').classList.contains('hidden')) {
+        renderCustomModalGrid();
+      }
+    }
+
+    function renderCustomModalGrid() {
+      const sizeVal = document.getElementById('matrix-size-select').value;
+      const [rStr, cStr] = sizeVal.split('x');
+      const numRows = parseInt(rStr, 10);
+      const numCols = parseInt(cStr, 10);
+
+      const container = document.getElementById('custom-grid-container');
+      let html = `<table class="border-collapse text-center">`;
+      
+      for (let r = 0; r < numRows; r++) {
+        html += `<tr>`;
+        for (let c = 0; c < numCols; c++) {
+          const isAugmented = (c === numCols - 1);
+          const borderClass = isAugmented ? "border-l-2 border-dashed border-blue-500/50 pl-3 pr-2" : "px-1.5";
+          const defaultVal = (matrix.length === numRows && matrix[0].length === numCols) ? matrix[r][c].toString() : '0';
+          
+          html += `<td class="py-1.5 ${borderClass}">
+            <input type="text" id="custom-cell-${r}-${c}" value="${defaultVal}" class="w-14 h-9 bg-slate-900 border border-slate-600 rounded text-center text-sm font-mono text-slate-100 focus:outline-none focus:border-indigo-500" />
+          </td>`;
+        }
+        html += `</tr>`;
+      }
+      html += `</table>`;
+      container.innerHTML = html;
+    }
+
+    function applyCustomMatrix() {
+      const sizeVal = document.getElementById('matrix-size-select').value;
+      const [rStr, cStr] = sizeVal.split('x');
+      const numRows = parseInt(rStr, 10);
+      const numCols = parseInt(cStr, 10);
+
+      const newMat = [];
+      try {
+        for (let r = 0; r < numRows; r++) {
+          const row = [];
+          for (let c = 0; c < numCols; c++) {
+            const rawVal = document.getElementById(`custom-cell-${r}-${c}`).value.trim() || "0";
+            const frac = new Fraction(rawVal);
+            row.push(frac);
+          }
+          newMat.push(row);
+        }
+
+        matrix = newMat;
+        historyStack = [{ matrix: cloneMatrix(matrix), desc: `Custom ${numRows}x${numCols} Input System` }];
+        closeCustomModal();
+        hideHint();
+        updateUI();
+      } catch (e) {
+        alert("Invalid matrix input! Please enter integers or fractions (e.g. 2, -5, 1/3, -4/7).");
+      }
+    }
+
+    function resetMatrix() {
+      if (historyStack.length > 0) {
+        matrix = cloneMatrix(historyStack[0].matrix);
+        historyStack = [historyStack[0]];
+        hideHint();
+        updateUI();
+      }
+    }
+
+    function undoStep() {
+      if (historyStack.length > 1) {
+        historyStack.pop();
+        matrix = cloneMatrix(historyStack[historyStack.length - 1].matrix);
+        hideHint();
+        updateUI();
+      }
+    }
+
+    function updateSelectOptions() {
+      const rows = matrix.length;
+      const optionsHTML = Array.from({ length: rows }, (_, i) => `<option value="${i}">R${i + 1}</option>`).join('');
+      
+      document.getElementById('swap-r1').innerHTML = optionsHTML;
+      document.getElementById('swap-r2').innerHTML = optionsHTML;
+      document.getElementById('scale-r').innerHTML = optionsHTML;
+      document.getElementById('add-rt').innerHTML = optionsHTML;
+      document.getElementById('add-rs').innerHTML = optionsHTML;
+
+      if (rows > 1) {
+        document.getElementById('swap-r2').selectedIndex = 1;
+        document.getElementById('add-rs').selectedIndex = 1;
+      }
+    }
+
+    function renderMatrix() {
+      const container = document.getElementById('matrix-container');
+      const rows = matrix.length;
+      const cols = matrix[0].length;
+
+      let html = `<table class="border-collapse text-center text-lg font-mono font-medium">`;
+      for (let i = 0; i < rows; i++) {
+        html += `<tr>`;
+        for (let j = 0; j < cols; j++) {
+          const borderClass = (j === cols - 1) ? "border-l-2 border-dashed border-blue-500/50 pl-4 pr-3" : "px-3";
+          html += `<td class="py-2 ${borderClass} text-slate-100">\\(${matrix[i][j].toTex()}\\)</td>`;
+        }
+        html += `</tr>`;
+      }
+      html += `</table>`;
+      container.innerHTML = html;
+    }
+
+    /* Evaluates REF and RREF according to strict user definitions */
+    function checkMatrixState() {
+      const rows = matrix.length;
+      const cols = matrix[0].length;
+      
+      let isREF = true;
+      let isRREF = true;
+      let lastPivotCol = -1;
+      let seenZeroRow = false;
+
+      for (let r = 0; r < rows; r++) {
+        let pivotCol = -1;
+        for (let c = 0; c < cols - 1; c++) {
+          if (!matrix[r][c].isZero()) {
+            pivotCol = c;
+            break;
+          }
+        }
+
+        if (pivotCol === -1) {
+          seenZeroRow = true;
+        } else {
+          if (seenZeroRow) isREF = false;
+          if (!matrix[r][pivotCol].isOne()) isREF = false;
+          if (pivotCol <= lastPivotCol) isREF = false;
+          lastPivotCol = pivotCol;
+
+          for (let r2 = r + 1; r2 < rows; r2++) {
+            if (!matrix[r2][pivotCol].isZero()) isREF = false;
+          }
+
+          for (let r2 = 0; r2 < rows; r2++) {
+            if (r2 !== r && !matrix[r2][pivotCol].isZero()) isRREF = false;
+          }
+        }
+      }
+
+      if (!isREF) isRREF = false;
+
+      const badgesContainer = document.getElementById('status-badges');
+      let html = '';
+      if (isRREF) {
+        html += `<span class="bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 text-xs px-2.5 py-1 rounded-full font-semibold">Reduced Row Echelon Form (RREF)</span>`;
+      } else if (isREF) {
+        html += `<span class="bg-blue-500/20 text-blue-400 border border-blue-500/40 text-xs px-2.5 py-1 rounded-full font-semibold">Row Echelon Form (REF)</span>`;
+      } else {
+        html += `<span class="bg-slate-700 text-slate-400 text-xs px-2.5 py-1 rounded-full font-semibold">Not in REF</span>`;
+      }
+      badgesContainer.innerHTML = html;
+    }
+
+    function renderHistory() {
+      const list = document.getElementById('history-list');
+      list.innerHTML = historyStack.map((item, idx) => `
+        <div class="bg-slate-900 border border-slate-700/80 rounded-lg p-3 text-xs flex justify-between items-center">
+          <div>
+            <span class="text-blue-400 font-bold mr-2">Step ${idx}:</span>
+            <span class="text-slate-200">${item.desc}</span>
+          </div>
+        </div>
+      `).reverse().join('');
+    }
+
+    function applySwap() {
+      const r1 = parseInt(document.getElementById('swap-r1').value, 10);
+      const r2 = parseInt(document.getElementById('swap-r2').value, 10);
+      if (r1 === r2) return;
+      const temp = matrix[r1];
+      matrix[r1] = matrix[r2];
+      matrix[r2] = temp;
+      pushStep(`Swap $R_${r1 + 1} \\leftrightarrow R_${r2 + 1}$`);
+    }
+
+    function applyScale() {
+      const r = parseInt(document.getElementById('scale-r').value, 10);
+      const kStr = document.getElementById('scale-k').value.trim();
+      if (!kStr) return;
+      try {
+        const k = new Fraction(kStr);
+        if (k.isZero()) {
+          alert("Scalar k cannot be 0.");
+          return;
+        }
+        matrix[r] = matrix[r].map(val => val.mul(k));
+        pushStep(`Scale $${k.toTex()} \\cdot R_${r + 1} \\to R_${r + 1}$`);
+        document.getElementById('scale-k').value = '';
+      } catch (e) {
+        alert("Invalid scalar input.");
+      }
+    }
+
+    function applyAddMultiple() {
+      const rt = parseInt(document.getElementById('add-rt').value, 10);
+      const rs = parseInt(document.getElementById('add-rs').value, 10);
+      const kStr = document.getElementById('add-k').value.trim();
+
+      if (rt === rs) {
+        alert("Target and Source rows must be different.");
+        return;
+      }
+      if (!kStr) return;
+
+      try {
+        const k = new Fraction(kStr);
+        matrix[rt] = matrix[rt].map((val, idx) => val.add(k.mul(matrix[rs][idx])));
+        pushStep(`Add $R_${rt + 1} + (${k.toTex()}) \\cdot R_${rs + 1} \\to R_${rt + 1}$`);
+        document.getElementById('add-k').value = '';
+      } catch (e) {
+        alert("Invalid scalar input.");
+      }
+    }
+
+    function pushStep(desc) {
+      historyStack.push({ matrix: cloneMatrix(matrix), desc: desc });
+      hideHint();
+      updateUI();
+    }
+
+    /* Hint Provider respecting Target Mode (REF vs RREF) */
+    function getHint() {
+      const targetMode = document.getElementById('target-mode-select').value;
+      const rows = matrix.length;
+      const cols = matrix[0].length;
+
+      // Forward Elimination steps for REF
+      for (let c = 0; c < cols - 1; c++) {
+        let nonZeroRow = -1;
+        for (let r = c; r < rows; r++) {
+          if (!matrix[r][c].isZero()) {
+            nonZeroRow = r;
+            break;
+          }
+        }
+
+        if (nonZeroRow === -1) continue;
+
+        if (nonZeroRow !== c) {
+          showHint(`Swap $R_${c + 1}$ with $R_${nonZeroRow + 1}$ ($R_${c + 1} \\leftrightarrow R_${nonZeroRow + 1}$) to place a non-zero leading coefficient in column ${c + 1}.`);
+          return;
+        }
+
+        if (!matrix[c][c].isOne()) {
+          const inv = new Fraction(matrix[c][c].den, matrix[c][c].num);
+          showHint(`Scale row $R_${c + 1}$ by $${inv.toTex()}$ ($${inv.toTex()} \\cdot R_${c + 1} \\to R_${c + 1}$) to make the leading entry 1.`);
+          return;
+        }
+
+        for (let r = c + 1; r < rows; r++) {
+          if (!matrix[r][c].isZero()) {
+            const mult = matrix[r][c].mul(new Fraction(-1));
+            showHint(`Eliminate $R_${r + 1}[${c + 1}]$: Add $${mult.toTex()} \\cdot R_${c + 1}$ to row $R_${r + 1}$ ($R_${r + 1} + (${mult.toTex()}) \\cdot R_${c + 1} \\to R_${r + 1}$).`);
+            return;
+          }
+        }
+      }
+
+      if (targetMode === 'REF') {
+        showHint("The matrix is already in Row Echelon Form (REF)!");
+        return;
+      }
+
+      // Back Elimination steps above pivots for RREF
+      for (let r = rows - 1; r >= 0; r--) {
+        let pivotCol = -1;
+        for (let c = 0; c < cols - 1; c++) {
+          if (!matrix[r][c].isZero()) {
+            pivotCol = c;
+            break;
+          }
+        }
+
+        if (pivotCol === -1) continue;
+
+        for (let rAbove = r - 1; rAbove >= 0; rAbove--) {
+          if (!matrix[rAbove][pivotCol].isZero()) {
+            const mult = matrix[rAbove][pivotCol].mul(new Fraction(-1));
+            showHint(`RREF Elimination above pivot $R_${r + 1}[${pivotCol + 1}]$: Add $${mult.toTex()} \\cdot R_${r + 1}$ to row $R_${rAbove + 1}$ ($R_${rAbove + 1} + (${mult.toTex()}) \\cdot R_${r + 1} \\to R_${rAbove + 1}$).`);
+            return;
+          }
+        }
+      }
+
+      showHint("The matrix is already in Reduced Row Echelon Form (RREF)!");
+    }
+
+    function showHint(msg) {
+      const card = document.getElementById('hint-card');
+      const text = document.getElementById('hint-text');
+      text.innerHTML = msg;
+      card.classList.remove('hidden');
+      typesetMath([card]);
+    }
+
+    function hideHint() {
+      document.getElementById('hint-card').classList.add('hidden');
+    }
+
+    function typesetMath(elements) {
+      mathJaxPromise = mathJaxPromise.then(() => {
+        if (window.MathJax && MathJax.typesetPromise) {
+          if (MathJax.typesetClear) {
+            MathJax.typesetClear(elements);
+          }
+          return MathJax.typesetPromise(elements);
+        }
+      }).catch((err) => console.log('MathJax queue handling:', err));
+    }
+
+    function updateUI() {
+      renderMatrix();
+      updateSelectOptions();
+      checkMatrixState();
+      renderHistory();
+
+      document.getElementById('btn-undo').disabled = historyStack.length <= 1;
+
+      typesetMath([
+        document.getElementById('matrix-container'),
+        document.getElementById('history-list')
+      ]);
+    }
+
+    window.onload = () => {
+      generateRandomMatrix();
+    };
+  </script>
+</body>
+</html>
